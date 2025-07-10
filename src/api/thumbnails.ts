@@ -5,36 +5,36 @@ import type { ApiConfig } from "../config";
 import type { BunRequest } from "bun";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
 
-type Thumbnail = {
-  data: ArrayBuffer;
-  mediaType: string;
-};
+// type Thumbnail = {
+//   data: Buffer;
+//   mediaType: string;
+// };
 
-const videoThumbnails: Map<string, Thumbnail> = new Map();
+// const videoThumbnails: Map<string, Thumbnail> = new Map();
 
-export async function handlerGetThumbnail(cfg: ApiConfig, req: BunRequest) {
-  const { videoId } = req.params as { videoId?: string };
-  if (!videoId) {
-    throw new BadRequestError("Invalid video ID");
-  }
+// export async function handlerGetThumbnail(cfg: ApiConfig, req: BunRequest) {
+//   const { videoId } = req.params as { videoId?: string };
+//   if (!videoId) {
+//     throw new BadRequestError("Invalid video ID");
+//   }
 
-  const video = getVideo(cfg.db, videoId);
-  if (!video) {
-    throw new NotFoundError("Couldn't find video");
-  }
+//   const video = getVideo(cfg.db, videoId);
+//   if (!video) {
+//     throw new NotFoundError("Couldn't find video");
+//   }
 
-  const thumbnail = videoThumbnails.get(videoId);
-  if (!thumbnail) {
-    throw new NotFoundError("Thumbnail not found");
-  }
+//   const thumbnail = videoThumbnails.get(videoId);
+//   if (!thumbnail) {
+//     throw new NotFoundError("Thumbnail not found");
+//   }
 
-  return new Response(thumbnail.data, {
-    headers: {
-      "Content-Type": thumbnail.mediaType,
-      "Cache-Control": "no-store",
-    },
-  });
-}
+//   return new Response(thumbnail.data, {
+//     headers: {
+//       "Content-Type": thumbnail.mediaType,
+//       "Cache-Control": "no-store",
+//     },
+//   });
+// }
 
 export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   const { videoId } = req.params as { videoId?: string };
@@ -71,7 +71,11 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   const mediaType = thumbnailFile.type;
   
   // Read all image data into an ArrayBuffer
-  const data = await thumbnailFile.arrayBuffer();
+  const arrayBufferData = await thumbnailFile.arrayBuffer();
+  const data = Buffer.from(arrayBufferData);
+  const base64Data = data.toString("base64");
+
+  const dataURL = `data:${mediaType};base64,${base64Data}`;
   
   // Get the video's metadata from the database
   const video = getVideo(cfg.db, videoId);
@@ -85,18 +89,18 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   }
   
   // Save the thumbnail to the global map
-  videoThumbnails.set(videoId, {
-    data,
-    mediaType
-  });
+  // videoThumbnails.set(videoId, {
+  //   data,
+  //   mediaType
+  // });
   
   // Generate the thumbnail URL
-  const thumbnailURL = `http://localhost:${cfg.port}/api/thumbnails/${videoId}`;
+  // const thumbnailURL = `http://localhost:${cfg.port}/api/thumbnails/${videoId}`;
   
   // Update the video metadata with the new thumbnail URL
   const updatedVideo = {
     ...video,
-    thumbnailURL
+    thumbnailURL: dataURL,
   };
   
   // Update the record in the database
