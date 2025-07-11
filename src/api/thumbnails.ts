@@ -71,20 +71,13 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   // Get the media type from the file
   const mediaType = thumbnailFile.type;
 
-  // Determine file extension from media type
-  let fileExtension = "jpg"; // Default extension
-  
-  if (mediaType.includes("png")) {
-    fileExtension = "png";
-  } else if (mediaType.includes("jpeg") || mediaType.includes("jpg")) {
-    fileExtension = "jpg";
-  } else if (mediaType.includes("gif")) {
-    fileExtension = "gif";
-  } else if (mediaType.includes("webp")) {
-    fileExtension = "webp";
-  } else if (mediaType.includes("svg")) {
-    fileExtension = "svg";
+  // Validate that the file is either JPEG or PNG
+  if (!(mediaType === 'image/jpeg' || mediaType === 'image/png')) {
+    throw new BadRequestError("Only JPEG and PNG images are supported");
   }
+
+  // Determine file extension from media type
+  let fileExtension = mediaType === 'image/png' ? 'png' : 'jpg';
   
   // Create a unique filename using the videoId
   const filename = `${videoId}.${fileExtension}`;
