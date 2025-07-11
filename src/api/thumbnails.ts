@@ -4,6 +4,7 @@ import { getVideo, updateVideo } from "../db/videos";
 import type { ApiConfig } from "../config";
 import type { BunRequest } from "bun";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
+import * as path from "path";
 
 // type Thumbnail = {
 //   data: Buffer;
@@ -69,13 +70,37 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   
   // Get the media type from the file
   const mediaType = thumbnailFile.type;
+
+  // Determine file extension from media type
+  let fileExtension = "jpg"; // Default extension
+  
+  if (mediaType.includes("png")) {
+    fileExtension = "png";
+  } else if (mediaType.includes("jpeg") || mediaType.includes("jpg")) {
+    fileExtension = "jpg";
+  } else if (mediaType.includes("gif")) {
+    fileExtension = "gif";
+  } else if (mediaType.includes("webp")) {
+    fileExtension = "webp";
+  } else if (mediaType.includes("svg")) {
+    fileExtension = "svg";
+  }
+  
+  // Create a unique filename using the videoId
+  const filename = `${videoId}.${fileExtension}`;
+  
+  // Create the full path to save the file
+  const filePath = path.join(cfg.assetsRoot, filename);
   
   // Read all image data into an ArrayBuffer
   const arrayBufferData = await thumbnailFile.arrayBuffer();
-  const data = Buffer.from(arrayBufferData);
-  const base64Data = data.toString("base64");
 
-  const dataURL = `data:${mediaType};base64,${base64Data}`;
+  // Write the file to disk
+  await Bun.write(filePath, arrayBufferData);
+  // const data = Buffer.from(arrayBufferData);
+  // const base64Data = data.toString("base64");
+
+  // const dataURL = `data:${mediaType};base64,${base64Data}`;
   
   // Get the video's metadata from the database
   const video = getVideo(cfg.db, videoId);
@@ -96,11 +121,14 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   
   // Generate the thumbnail URL
   // const thumbnailURL = `http://localhost:${cfg.port}/api/thumbnails/${videoId}`;
+
+  // Generate the thumbnail URL that points to the asset server
+  const thumbnailURL = `/assets/${filename}`;
   
   // Update the video metadata with the new thumbnail URL
   const updatedVideo = {
     ...video,
-    thumbnailURL: dataURL,
+    thumbnailURL,
   };
   
   // Update the record in the database
