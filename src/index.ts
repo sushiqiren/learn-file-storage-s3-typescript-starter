@@ -2,7 +2,7 @@ import { cfg } from "./config";
 import { handlerLogin, handlerRefresh, handlerRevoke } from "./api/auth";
 import {
   errorHandlingMiddleware,
-  cacheMiddleware,
+  noCacheMiddleware,
   withConfig,
 } from "./api/middleware";
 import { handlerUsersCreate } from "./api/users";
@@ -17,6 +17,7 @@ import { handlerUploadThumbnail } from "./api/thumbnails";
 import { handlerReset } from "./api/reset";
 import { ensureAssetsDir } from "./api/assets";
 import spa from "./app/index.html";
+import * as path from "path";
 
 ensureAssetsDir(cfg);
 
@@ -64,9 +65,9 @@ Bun.serve({
     const path = url.pathname;
 
     if (path.startsWith("/assets")) {
-      return cacheMiddleware(() =>
-        serveStaticFile(path.replace("/assets/", ""), cfg.assetsRoot)
-      )(req);
+      return noCacheMiddleware(async (req) => {
+        return await serveStaticFile(path.replace("/assets/", ""), cfg.assetsRoot);
+      })(req);
     }
 
     return new Response("Not Found", { status: 404 });
@@ -80,10 +81,13 @@ Bun.serve({
 console.log(`Server running at http://localhost:${cfg.port}`);
 
 async function serveStaticFile(relativePath: string, basePath: string) {
-  const filePath = `${basePath}/${relativePath}`;
+  const filePath = path.join(basePath, relativePath);
 
   try {
     const f = Bun.file(filePath);
+    if (!(await f.exists())) {
+      return new Response("File not found", { status: 404 });
+    }
     return new Response(await f.bytes(), {
       headers: { "Content-Type": f.type || "application/octet-stream" },
     });

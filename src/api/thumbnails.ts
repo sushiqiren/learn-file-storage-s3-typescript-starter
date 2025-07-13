@@ -5,6 +5,7 @@ import type { ApiConfig } from "../config";
 import type { BunRequest } from "bun";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
 import * as path from "path";
+import { randomBytes } from "crypto";
 
 // type Thumbnail = {
 //   data: Buffer;
@@ -79,8 +80,9 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   // Determine file extension from media type
   let fileExtension = mediaType === 'image/png' ? 'png' : 'jpg';
   
-  // Create a unique filename using the videoId
-  const filename = `${videoId}.${fileExtension}`;
+  // Generate a random filename using 32 random bytes
+  const randomFileName = randomBytes(32).toString("base64url");
+  const filename = `${randomFileName}.${fileExtension}`;
   
   // Create the full path to save the file
   const filePath = path.join(cfg.assetsRoot, filename);
@@ -116,8 +118,8 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   // const thumbnailURL = `http://localhost:${cfg.port}/api/thumbnails/${videoId}`;
 
   // Generate the thumbnail URL that points to the asset server
-  const thumbnailURL = `/assets/${filename}`;
-  
+  const thumbnailURL = `http://localhost:${cfg.port}/assets/${filename}`;
+  console.log("Generated thumbnailURL:", thumbnailURL);
   // Update the video metadata with the new thumbnail URL
   const updatedVideo = {
     ...video,
