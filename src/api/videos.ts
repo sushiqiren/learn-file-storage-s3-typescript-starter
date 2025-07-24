@@ -1,7 +1,7 @@
 import { rm } from "fs/promises";
 import path from "path";
 import { getBearerToken, validateJWT } from "../auth";
-import { getVideo, updateVideo } from "../db/videos";
+import { getVideo, updateVideo, type Video } from "../db/videos";
 import { respondWithJSON } from "./json";
 import { uploadVideoToS3 } from "../s3";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
@@ -49,15 +49,18 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
   const key = `${aspectRatio}/${videoId}.mp4`;
   await uploadVideoToS3(cfg, key, processedFilePath, "video/mp4");
 
-  const videoURL = `https://${cfg.s3Bucket}.s3.${cfg.s3Region}.amazonaws.com/${key}`;
-  video.videoURL = videoURL;
+  // Store only the key in videoURL instead of the full URL
+  video.videoURL = key;
   updateVideo(cfg.db, video);
 
   await Promise.all([
     rm(tempFilePath, { force: true }),
     rm(`${tempFilePath}.processed.mp4`, { force: true }),
   ]);
-  return respondWithJSON(200, video);
+
+  // Generate presigned URL before returning
+  const signedVideo = dbVideoToSignedVideo(cfg, video);
+  return respondWithJSON(200, signedVideo);
 }
 
 export async function getVideoAspectRatio(filePath: string) {
@@ -132,4 +135,29 @@ export async function processVideoForFastStart(inputFilePath: string) {
   }
 
   return processedFilePath;
+}
+
+export function generatePresignedURL(cfg: ApiConfig, key: string, expireTime: number): string {
+  const s3file = cfg.s3Client.file(key, { bucket: cfg.s3Bucket });
+  const presignedURL = s3file.presign({ expiresIn: expireTime });
+  return presignedURL;
+}
+
+export function dbVideoToSignedVideo(cfg: ApiConfig, video: Video): Video {
+  // Get the S3 key from the current video's videoURL
+  const key = video.videoURL;
+  
+  // Check if videoURL exists
+   if (!key) {
+    return video;
+  }
+  
+  // Generate a presigned URL for the video (expires in 1 hour)
+  const presignedURL = generatePresignedURL(cfg, key, 3600);
+  
+  // Return the video with the presigned URL
+  return {
+    ...video,
+    videoURL: presignedURL
+  };
 }
