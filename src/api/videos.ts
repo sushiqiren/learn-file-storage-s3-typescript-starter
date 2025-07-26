@@ -50,7 +50,7 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
   await uploadVideoToS3(cfg, key, processedFilePath, "video/mp4");
 
   // Store only the key in videoURL instead of the full URL
-  video.videoURL = key;
+  video.videoURL = `https://${cfg.s3CfDistribution}/${key}`;
   updateVideo(cfg.db, video);
 
   await Promise.all([
@@ -59,8 +59,8 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
   ]);
 
   // Generate presigned URL before returning
-  const signedVideo = dbVideoToSignedVideo(cfg, video);
-  return respondWithJSON(200, signedVideo);
+  // const signedVideo = dbVideoToSignedVideo(cfg, video);
+  return respondWithJSON(200, video);
 }
 
 export async function getVideoAspectRatio(filePath: string) {
@@ -137,27 +137,27 @@ export async function processVideoForFastStart(inputFilePath: string) {
   return processedFilePath;
 }
 
-export function generatePresignedURL(cfg: ApiConfig, key: string, expireTime: number): string {
-  const s3file = cfg.s3Client.file(key, { bucket: cfg.s3Bucket });
-  const presignedURL = s3file.presign({ expiresIn: expireTime });
-  return presignedURL;
-}
+// export function generatePresignedURL(cfg: ApiConfig, key: string, expireTime: number): string {
+//   const s3file = cfg.s3Client.file(key, { bucket: cfg.s3Bucket });
+//   const presignedURL = s3file.presign({ expiresIn: expireTime });
+//   return presignedURL;
+// }
 
-export function dbVideoToSignedVideo(cfg: ApiConfig, video: Video): Video {
-  // Get the S3 key from the current video's videoURL
-  const key = video.videoURL;
+// export function dbVideoToSignedVideo(cfg: ApiConfig, video: Video): Video {
+//   // Get the S3 key from the current video's videoURL
+//   const key = video.videoURL;
   
-  // Check if videoURL exists
-   if (!key) {
-    return video;
-  }
+//   // Check if videoURL exists
+//    if (!key) {
+//     return video;
+//   }
   
-  // Generate a presigned URL for the video (expires in 1 hour)
-  const presignedURL = generatePresignedURL(cfg, key, 3600);
+//   // Generate a presigned URL for the video (expires in 1 hour)
+//   const presignedURL = generatePresignedURL(cfg, key, 3600);
   
-  // Return the video with the presigned URL
-  return {
-    ...video,
-    videoURL: presignedURL
-  };
-}
+//   // Return the video with the presigned URL
+//   return {
+//     ...video,
+//     videoURL: presignedURL
+//   };
+// }

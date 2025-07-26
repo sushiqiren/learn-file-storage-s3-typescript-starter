@@ -1,9 +1,9 @@
 import { type ApiConfig } from "../config";
 import { getBearerToken, validateJWT } from "../auth";
-import { createVideo, deleteVideo, getVideo, getVideos } from "../db/videos";
+import { createVideo, deleteVideo, getVideo, getVideos, type Video } from "../db/videos";
 import { respondWithJSON } from "./json";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
-import { dbVideoToSignedVideo } from "./videos";
+// import { dbVideoToSignedVideo } from "./videos";
 import type { BunRequest } from "bun";
 
 export async function handlerVideoMetaCreate(cfg: ApiConfig, req: Request) {
@@ -57,8 +57,9 @@ export async function handlerVideoGet(cfg: ApiConfig, req: BunRequest) {
   }
 
   // Generate presigned URL before returning
-  const signedVideo = dbVideoToSignedVideo(cfg, video);
-  return respondWithJSON(200, signedVideo);
+  // const signedVideo = dbVideoToSignedVideo(cfg, video);
+  const videoWithUrl = video.videoURL ? toCloudFrontURL(cfg, video) : video;
+  return respondWithJSON(200, videoWithUrl);
 }
 
 export async function handlerVideosRetrieve(cfg: ApiConfig, req: Request) {
@@ -68,6 +69,17 @@ export async function handlerVideosRetrieve(cfg: ApiConfig, req: Request) {
   const videos = getVideos(cfg.db, userID);
   
   // Generate presigned URLs for all videos before returning
-  const signedVideos = videos.map(video => dbVideoToSignedVideo(cfg, video));
-  return respondWithJSON(200, signedVideos);
+  // const signedVideos = videos.map(video => dbVideoToSignedVideo(cfg, video));
+  const videosWithUrls = videos.map(video => video.videoURL ? toCloudFrontURL(cfg, video) : video);
+  return respondWithJSON(200, videosWithUrls);
+}
+
+function toCloudFrontURL(cfg: ApiConfig, video: Video): Video {
+  if (video.videoURL && !video.videoURL.includes("cloudfront.net")) {
+    return {
+      ...video,
+      videoURL: `https://${cfg.s3CfDistribution}/${video.videoURL}`,
+    };
+  }
+  return video;
 }
